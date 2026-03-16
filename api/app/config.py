@@ -1,3 +1,4 @@
+from typing import List
 from decouple import config
 
 class Settings:
@@ -9,9 +10,10 @@ class Settings:
     GEMINI_API_KEY: str = config("GEMINI_API_KEY")
     
     # CORS settings
-    ALLOWED_ORIGINS = [
-        "http://localhost:3000",  # React dev server
-        "http://127.0.0.1:3000",
-    ]
+    ALLOWED_ORIGINS: List[str] = config(
+        "ALLOWED_ORIGINS", 
+        default="http://localhost:3000,http://127.0.0.1:3000",
+        cast=lambda v: [s.strip() for s in v.split(",")]
+    )
 
 settings = Settings()
