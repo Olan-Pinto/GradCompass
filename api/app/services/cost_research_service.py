@@ -1,13 +1,11 @@
-import warnings
-warnings.filterwarnings("ignore", category=RuntimeWarning, module="langchain_community")
-
 from typing import Dict, Any, Optional, List
 from datetime import datetime
 import re
 import asyncio
 from langchain_community.tools import DuckDuckGoSearchRun
-from langchain.agents import initialize_agent, Tool, AgentType
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_core.messages import HumanMessage
+from langgraph.prebuilt import create_react_agent
 from app.config import settings
 import logging
 
@@ -17,24 +15,37 @@ class CostResearchService:
     def __init__(self):
         """Initialize the cost research service with LLM and search tools"""
         self.llm = ChatGoogleGenerativeAI(
-            model="gemini-2.0-flash-exp",
+            model="gemini-2.5-flash",
             google_api_key=settings.GEMINI_API_KEY,
             temperature=0.1
         )
         self.search = DuckDuckGoSearchRun()
-        self.tools = [
-            Tool(
-                name="web_search",
-                description="Search the internet for current information",
-                func=self.search.run
-            )
-        ]
-        self.agent = initialize_agent(
-            self.tools, 
-            self.llm, 
-            agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
-            verbose=False  # Set to False to reduce noise in production
-        )
+        self.tools = [self.search]
+        # Using the modern LangGraph prebuilt ReAct agent
+        self.agent = create_react_agent(self.llm, tools=self.tools)
+
+    async def _run_agent(self, prompt: str) -> str:
+        """Helper to run the LangGraph agent and extract the final response"""
+        try:
+            result = await self.agent.ainvoke({"messages": [HumanMessage(content=prompt)]})
+            # LangGraph ReAct agent returns the full message history in "messages"
+            # The last message should be the AI's final response
+            content = result["messages"][-1].content
+            
+            # Handle list content (common in some model/LLM versions)
+            if isinstance(content, list):
+                text_parts = []
+                for part in content:
+                    if isinstance(part, dict) and "text" in part:
+                        text_parts.append(part["text"])
+                    elif isinstance(part, str):
+                        text_parts.append(part)
+                return "".join(text_parts)
+            
+            return str(content)
+        except Exception as e:
+            logger.error(f"Agent execution failed: {e}")
+            raise
 
     async def research_tuition_costs(self, city: str, year: str, university_name: Optional[str] = None) -> Dict[str, Any]:
         """Research tuition costs for universities in the specified city"""
@@ -81,36 +92,47 @@ class CostResearchService:
             Search Results:
             {search_data}
 
-            Please provide a structured JSON response with:
+            Provide a comprehensive tuition cost guide for an international graduate student on F1 visa planning to study {university_info} in {year}.
 
-            1. **tuition_breakdown**:
-            - graduate_program_tuition_per_year: estimated range
-            - international_student_fees: additional fees
-            - technology_lab_fees: estimated costs
-            - health_insurance: required coverage costs
-            - other_mandatory_fees: miscellaneous costs
+            Please provide:
 
-            2. **university_comparison** (if multiple universities):
+            1. **Tuition Costs Breakdown**:
+            - Graduate program tuition (per semester/year)
+            - International student fees
+            - Technology/Lab fees
+            - Health insurance requirements
+            - Other mandatory fees
+
+            2. **University Comparison** (if multiple universities in city):
             - List major universities with tuition ranges
+            - Ranking vs cost analysis
 
-            3. **financial_aid**:
-            - scholarships_available: list of opportunities
-            - assistantship_opportunities: TA/RA options
-            - work_study_programs: available programs
+            3. **Financial Aid Options**:
+            - Scholarships for international students
+            - Graduate assistantships (TA/RA opportunities)
+            - Work study programs
+            - Fellowship opportunities
 
-            4. **f1_visa_requirements**:
-            - i20_tuition_amount: required proof of funds
-            - sevis_fee: current fee amount
+            4. **Payment Options**:
+            - Payment plans available
+            - Currency exchange considerations
+            - International wire transfer fees
 
-            5. **estimated_costs**:
-            - one_year_masters: total estimate
-            - two_year_masters: total estimate
-            - phd_program: if applicable
+            5. **F1 Visa Financial Requirements**:
+            - I-20 tuition amount requirements
+            - Proof of funds needed
+            - SEVIS fee information
 
-            Provide specific dollar amounts where possible and format as a practical guide.
+            6. **Money-Saving Strategies**:
+            - In-state tuition possibilities
+            - Course load optimization
+            - Summer session costs
+
+            Format as a clear, practical guide with specific dollar amounts where possible.
+            Include estimated total costs for different scenarios (1-year masters, 2-year masters, PhD, etc.).
             """
             
-            response = await asyncio.to_thread(self.agent.run, tuition_prompt)
+            response = await self._run_agent(tuition_prompt)
             
             return {
                 "status": "success",
@@ -163,7 +185,9 @@ class CostResearchService:
             Search Results:
             {search_data}
 
-            Please provide a structured response with:
+            Create a comprehensive cost of living guide for an international graduate student on F1 visa planning to study in {city} in {year}.
+
+            Please provide:
 
             1. **Monthly Budget Breakdown**:
             - Housing/Rent (include on-campus vs off-campus options)
@@ -187,7 +211,7 @@ class CostResearchService:
             Format as a clear, practical guide with specific dollar amounts and ranges where possible.
             """
             
-            response = await asyncio.to_thread(self.agent.run, prompt)
+            response = await self._run_agent(prompt)
             
             return {
                 "status": "success",
@@ -242,7 +266,14 @@ class CostResearchService:
             Search Results:
             {search_data}
 
-            Please provide detailed information about:
+            Create a comprehensive funding guide for an Indian student planning to study in {destination_country} in {year}.
+
+            ESTIMATED TOTAL COST NEEDED: ${total_estimated_cost:,.2f} (approximately ₹{total_estimated_cost * 86:,.0f})
+
+            Search Results:
+            {search_data}
+
+            Please provide:
 
             1. **MAJOR INDIAN BANKS EDUCATION LOANS**:
             - State Bank of India (SBI) - interest rates, loan amount, features
@@ -256,21 +287,50 @@ class CostResearchService:
             - ₹7.5 lakhs to ₹1.5 crores (with collateral/co-applicant)
             - Above ₹1.5 crores (premium loan products)
 
-            3. **LOAN RECOMMENDATION**:
+            3. **INTEREST RATES ANALYSIS**:
+            - Current interest rate ranges (fixed vs floating)
+            - Rate variations based on loan amount
+            - Special rates for premier institutions
+            - Women applicant benefits/concessions
+
+            4. **LOAN FEATURES COMPARISON**:
+            - Processing fees and other charges
+            - Moratorium period (study period + 1 year)
+            - Repayment tenure options
+            - Pre-payment and part-payment options
+
+            5. **ELIGIBILITY & DOCUMENTATION**:
+            - Age criteria and academic requirements
+            - Co-applicant requirements
+            - Collateral requirements for different loan amounts
+            - Documents needed for loan application
+
+            6. **GOVERNMENT SCHEMES & SUBSIDIES**:
+            - Central Sector Interest Subsidy Scheme
+            - Dr. A.P.J. Abdul Kalam Interest Subsidy Scheme
+            - State government schemes
+
+            7. **NBFCs & ALTERNATIVE LENDERS**:
+            - Credila Financial Services
+            - Avanse Financial Services
+            - Prodigy Finance
+
+            8. **LOAN RECOMMENDATION**:
             Based on the estimated cost of ${total_estimated_cost:,.2f}:
             - Best 3 loan options with reasons
             - Estimated EMI calculations
             - Total interest outgo over loan tenure
+            - Tax benefits available (Section 80E)
 
-            4. **APPLICATION STRATEGY**:
+            9. **APPLICATION STRATEGY**:
             - Timeline for loan application
-            - Documentation requirements
             - Tips for faster approval
+            - Common rejection reasons to avoid
 
             Format as a practical, actionable funding guide with current {year} rates and terms.
             """
             
-            response = await asyncio.to_thread(self.agent.run, funding_prompt)
+            response = await self._run_agent(funding_prompt)
             
             return {
                 "status": "success",
@@ -373,32 +433,65 @@ class CostResearchService:
 
                 ESTIMATED TOTAL ANNUAL COST: ${total_estimated_cost:,.2f}
 
-                Provide a comprehensive executive summary with:
+                Create a comprehensive financial planning guide that combines all this information. Provide:
 
-                1. **COMPLETE COST BREAKDOWN**:
-                - Total annual costs with ranges
-                - One-time setup costs
-                - Two-year program total estimate
+                1. **EXECUTIVE SUMMARY**:
+                - Total estimated annual cost breakdown
+                - Recommended funding strategy
+                - Timeline for financial planning and applications
+                - Key action items for the student
 
-                2. **RECOMMENDED FUNDING STRATEGY**:
-                - Best loan options for this cost range
-                - Optimal loan-to-self funding ratio
-                - Monthly EMI projections
+                2. **COMPLETE COST ANALYSIS**:
+                - Academic costs (tuition, fees, books)
+                - Living expenses (housing, food, transport, personal)
+                - One-time costs (visa, deposits, setup, travel)
+                - Annual total and 2-year program total
 
-                3. **ACTIONABLE TIMELINE**:
-                - When to apply for loans
-                - Visa documentation requirements
-                - Pre-arrival financial preparation
+                3. **OPTIMAL FUNDING STRATEGY**:
+                - Best 2-3 education loan recommendations
+                - Loan amount vs self-funding ratio
+                - EMI projections and repayment planning
+                - Tax benefits and savings strategies
+                - Scholarship opportunities to reduce loan burden
 
-                4. **RISK MITIGATION**:
+                4. **LOAN APPLICATION ROADMAP**:
+                - Timeline: when to apply for loans
+                - Documentation checklist
+                - Multiple bank application strategy
+                - Tips for loan approval
                 - Backup funding options
-                - Emergency fund recommendations
-                - Currency fluctuation protection
 
-                Format as an actionable financial blueprint with specific amounts and timelines.
+                5. **F1 VISA FINANCIAL DOCUMENTATION**:
+                - Exact I-20 amount requirements
+                - Bank statement preparation
+                - Loan sanction letter requirements
+                - Sponsor documentation if needed
+                - SEVIS fee and other visa costs
+
+                6. **MONTHLY BUDGET & CASH FLOW**:
+                - Pre-arrival costs breakdown
+                - First semester detailed budget
+                - Monthly living expenses tracking
+                - Emergency fund recommendations
+                - Currency exchange planning
+
+                7. **RISK MITIGATION**:
+                - What if loan is rejected?
+                - Currency fluctuation protection
+                - Emergency funding scenarios
+                - Part-time work opportunities and limitations
+
+                8. **GRADUATION & REPAYMENT PLANNING**:
+                - Expected starting salary post-graduation
+                - Loan repayment scenarios
+                - OPT/H1B financial implications
+                - Career ROI analysis
+
+                Make this a complete, actionable financial blueprint that an Indian student can follow from decision to graduation.
+                Include specific timelines, exact amounts, and step-by-step action items.
                 """
                 
-                comprehensive_response = await asyncio.to_thread(self.agent.run, final_prompt)
+                comprehensive_response = await self._run_agent(final_prompt)
                 
                 return {
                     "status": "success",

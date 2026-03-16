@@ -16,6 +16,7 @@ import DashboardPage from './pages/DashboardPage';
 import ProfileSetupPage from './pages/ProfileSetupPage';
 import WorkExperiencePage from './pages/WorkExperiencePage';
 import VisaInterviewPage from './pages/VisaInterviewPage';
+import FinancePlannerPage from './pages/FinancePlannerPage';
 
 // Protected Route Component
 function ProtectedRoute({ children }) {
@@ -132,6 +133,15 @@ function App() {
             element={
               <ProtectedRoute>
                 <VisaInterviewPage />
+              </ProtectedRoute>
+            } 
+          />
+          
+          <Route 
+            path="/finance-planner" 
+            element={
+              <ProtectedRoute>
+                <FinancePlannerPage />
               </ProtectedRoute>
             } 
           />

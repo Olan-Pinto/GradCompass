@@ -28,7 +28,7 @@ async def create_tables():
             print("Creating new tables...")
             await conn.run_sync(Base.metadata.create_all)
             
-        print("✅ Database tables created successfully!")
+        print("Database tables created successfully!")
         print("\nCreated tables:")
         print("- users")
         print("- user_profiles") 
@@ -37,7 +37,7 @@ async def create_tables():
         print("- interview_messages")
         
     except Exception as e:
-        print(f"❌ Error creating tables: {e}")
+        print(f"Error creating tables: {e}")
         raise
     finally:
         await engine.dispose()

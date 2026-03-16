@@ -15,6 +15,7 @@ import { useInterviewStore } from '../stores/interviewStore';
 import { useProfileStore } from '../stores/profileStore';
 import { useThemeStore } from '../stores/themeStore';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
+import MarkdownRenderer from '../components/ui/MarkdownRenderer';
 
 function VisaInterviewPage() {
   const [userInput, setUserInput] = useState('');
@@ -351,7 +352,7 @@ function VisaInterviewPage() {
       </div>
 
       {/* Messages Area */}
-      <div className={`pb-24 px-6 ${isStarted || isCompleted ? 'pt-6' : 'pt-0'}`}>
+      <div className={`flex-1 overflow-y-auto pb-24 px-6 custom-scrollbar ${isStarted || isCompleted ? 'pt-6' : 'pt-0'}`}>
         <div className="max-w-4xl mx-auto">
           <AnimatePresence mode="popLayout">
             {/* Welcome Card - Only show if not started */}
@@ -437,7 +438,7 @@ function VisaInterviewPage() {
                     )}
                     
                     <div className={`${styling.text} leading-relaxed`}>
-                      {message.content}
+                      <MarkdownRenderer content={message.content} />
                     </div>
                     
                     {message.message_type === 'final_decision' && (

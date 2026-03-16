@@ -136,6 +136,9 @@ function DashboardPage() {
       
       // Navigate to visa interview
       navigate('/visa-interview');
+    } else if (agent.agentType === 'finance_planner') {
+      // Navigate to finance planner
+      navigate('/finance-planner');
     } else {
       // Handle other agents (existing functionality)
       console.log(`Clicked on ${agent.name}`);

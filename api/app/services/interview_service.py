@@ -1,15 +1,15 @@
 from typing import Dict, Any, List, TypedDict, Annotated
-from langgraph.graph import StateGraph, END
+from langgraph.graph import StateGraph, START, END
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_core.messages import HumanMessage, AIMessage
+from langchain_core.messages import HumanMessage, AIMessage, BaseMessage
 from langgraph.graph.message import add_messages
 from app.models.user import User
 from app.models.profile import UserProfile, WorkExperience
 from app.config import settings
 
-# Define the state structure (same as your notebook)
+# Define the state structure (updated for LangGraph 1.x)
 class VisaInterviewState(TypedDict):
-    messages: Annotated[List[HumanMessage | AIMessage], add_messages]
+    messages: Annotated[List[BaseMessage], add_messages]
     transcript: List[dict]
     current_question: str
     summary: str
@@ -20,7 +20,7 @@ class VisaInterviewService:
     def __init__(self):
         # Initialize the LLM
         self.llm = ChatGoogleGenerativeAI(
-            model="gemini-2.0-flash",
+            model="gemini-2.5-flash",
             google_api_key=settings.GEMINI_API_KEY
         )
         self.user_profile = None
