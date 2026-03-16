@@ -7,7 +7,6 @@ import {
   AcademicCapIcon,
   GlobeAltIcon,
   BanknotesIcon,
-  DocumentTextIcon,
   SparklesIcon
 } from '@heroicons/react/24/outline';
 import { useNavigate } from 'react-router-dom';
@@ -52,21 +51,6 @@ function FinancePlannerPage() {
     });
   };
 
-  const renderSafeContent = (content) => {
-    if (!content) return null;
-    if (typeof content === 'string') return content;
-    if (Array.isArray(content)) {
-      return content.map((item, i) => (
-        <React.Fragment key={i}>
-          {renderSafeContent(item)}
-        </React.Fragment>
-      ));
-    }
-    if (typeof content === 'object') {
-      return content.text || content.content || JSON.stringify(content);
-    }
-    return String(content);
-  };
 
   return (
     <div className={`min-h-screen pb-20 ${

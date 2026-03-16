@@ -5,7 +5,6 @@ import {
   UserIcon,
   BriefcaseIcon,
   AcademicCapIcon,
-  ChartBarIcon,
   DocumentTextIcon,
   GlobeAltIcon,
   CurrencyDollarIcon,

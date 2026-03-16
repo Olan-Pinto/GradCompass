@@ -4,8 +4,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChatBubbleLeftRightIcon,
   PaperAirplaneIcon,
-  MicrophoneIcon,
-  StopIcon,
   ArrowLeftIcon,
   CheckCircleIcon,
   ExclamationCircleIcon,
@@ -28,7 +26,6 @@ function VisaInterviewPage() {
   const { sessionId } = useParams();
   const navigate = useNavigate();
   const { theme } = useThemeStore();
-  const { checkAgentRequirements } = useProfileStore();
   
   const {
     currentSession,
