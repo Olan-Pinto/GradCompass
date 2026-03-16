@@ -5,22 +5,35 @@ def calculate_profile_completion(profile: UserProfile, work_experiences: List[Wo
     """
     Calculate profile completion percentage and identify missing fields
     """
-    total_sections = 4
+    total_percentage = 0
     completed_sections = []
     missing_fields = []
     
-    # Section 1: Academic Background (25%)
+    # Section 1: Academic Background (30%)
     academic_fields = ['undergraduate_college', 'major', 'gpa', 'gpa_scale', 'graduation_year']
     academic_complete = all(getattr(profile, field) is not None for field in academic_fields)
     
     if academic_complete:
         completed_sections.append('Academic Background')
+        total_percentage += 30
     else:
         missing_academic = [field.replace('_', ' ').title() for field in academic_fields 
                           if getattr(profile, field) is None]
         missing_fields.extend(missing_academic)
     
-    # Section 2: Test Scores (25%) - At least one test score required
+    # Section 2: Goals & Preferences (30%)
+    goals_fields = ['target_degree', 'preferred_countries', 'target_field', 'budget_range', 'application_timeline']
+    goals_complete = all(getattr(profile, field) is not None for field in goals_fields)
+    
+    if goals_complete:
+        completed_sections.append('Goals & Preferences')
+        total_percentage += 30
+    else:
+        missing_goals = [field.replace('_', ' ').title() for field in goals_fields 
+                        if getattr(profile, field) is None]
+        missing_fields.extend(missing_goals)
+
+    # Section 3: Test Scores (20%)
     has_gre = profile.gre_score is not None
     has_toefl = profile.toefl_score is not None
     has_ielts = profile.ielts_score is not None
@@ -28,34 +41,23 @@ def calculate_profile_completion(profile: UserProfile, work_experiences: List[Wo
     
     if test_scores_complete:
         completed_sections.append('Test Scores')
+        total_percentage += 20
     else:
         missing_fields.append('At least one test score (GRE/TOEFL/IELTS)')
     
-    # Section 3: Work Experience (25%) - At least one experience required
+    # Section 4: Work Experience (20%)
     work_experience_complete = len(work_experiences) > 0
     
     if work_experience_complete:
         completed_sections.append('Work Experience')
+        total_percentage += 20
     else:
-        missing_fields.append('At least one work experience')
+        missing_fields.append('Work experience (optional but recommended)')
     
-    # Section 4: Goals & Preferences (25%)
-    goals_fields = ['target_degree', 'preferred_countries', 'target_field', 'budget_range', 'application_timeline']
-    goals_complete = all(getattr(profile, field) is not None for field in goals_fields)
-    
-    if goals_complete:
-        completed_sections.append('Goals & Preferences')
-    else:
-        missing_goals = [field.replace('_', ' ').title() for field in goals_fields 
-                        if getattr(profile, field) is None]
-        missing_fields.extend(missing_goals)
-    
-    # Calculate completion percentage
-    completion_percentage = (len(completed_sections) / total_sections) * 100
-    is_complete = completion_percentage == 100
+    is_complete = total_percentage == 100
     
     return {
-        'completion_percentage': int(completion_percentage),
+        'completion_percentage': int(total_percentage),
         'is_complete': is_complete,
         'completed_sections': completed_sections,
         'missing_fields': missing_fields

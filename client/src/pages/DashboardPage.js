@@ -123,34 +123,38 @@ function DashboardPage() {
   };
 
   // Handle agent click
-  const handleAgentClick = async (agent) => {
+  const handleAgentClick = (agent) => {
     if (agent.agentType === 'visa_assistant') {
-      // Check if profile requirements are met for visa assistant
-      const canAccess = completionStatus?.completion_percentage >= 70; // Require 70% completion
-      
-      if (!canAccess) {
-        // Show requirements not met
-        return;
-      }
-      
-      // Navigate to visa interview
       navigate('/visa-interview');
     } else if (agent.agentType === 'finance_planner') {
-      // Navigate to finance planner
       navigate('/finance-planner');
     } else {
-      // Handle other agents (existing functionality)
       console.log(`Clicked on ${agent.name}`);
     }
   };
 
   // Check if agent can be accessed
   const canAccessAgent = (agent) => {
-    if (agent.agentType === 'visa_assistant') {
-      return completionStatus?.completion_percentage >= 70;
-    }
-    // Add other agent requirements as needed
-    return true;
+    if (!profile) return false;
+    
+    // Check if required fields for this specific agent are missing in the profile
+    const mapping = {
+      'GPA': 'gpa',
+      'Target Field': 'target_field',
+      'Preferred Countries': 'preferred_countries',
+      'Target Degree': 'target_degree',
+      'Work Experience': 'work_experiences', // This needs careful check
+      'Budget Range': 'budget_range',
+      'At least one test score': 'test_scores' // This needs careful check
+    };
+
+    return agent.requiredFields.every(req => {
+      const field = mapping[req];
+      if (field === 'work_experiences') return profile.work_experiences?.length > 0;
+      if (field === 'test_scores') return profile.gre_score || profile.toefl_score || profile.ielts_score;
+      if (field === 'preferred_countries') return profile.preferred_countries?.length > 0;
+      return profile[field] !== null && profile[field] !== undefined && profile[field] !== '';
+    });
   };
 
   if (loading && !completionStatus) {

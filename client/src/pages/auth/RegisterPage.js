@@ -39,11 +39,23 @@ function RegisterPage() {
     setLoading(true);
     const { confirmPassword, ...userData } = data;
     const result = await registerUser(userData);
-    setLoading(false);
     
     if (result.success) {
-      navigate('/login');
+      // Auto-login after registration
+      const loginResult = await useAuthStore.getState().login({
+        email: userData.email,
+        password: userData.password
+      });
+      
+      if (loginResult.success) {
+        // Redirect to profile setup for new users
+        navigate('/profile/setup');
+      } else {
+        // If auto-login fails for some reason, go to login page
+        navigate('/login');
+      }
     }
+    setLoading(false);
   };
 
   return (

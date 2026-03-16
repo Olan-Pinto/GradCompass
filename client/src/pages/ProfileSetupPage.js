@@ -14,6 +14,7 @@ import {
   ArrowRightIcon,
 } from '@heroicons/react/24/outline';
 import { useProfileStore } from '../stores/profileStore';
+import { useAuthStore } from '../stores/authStore';
 import { useThemeStore } from '../stores/themeStore';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import FormInput from '../components/ui/FormInput';
@@ -25,32 +26,59 @@ const schema = yup.object({
   // Academic Background
   undergraduate_college: yup.string().required('College name is required'),
   major: yup.string().required('Major is required'),
-  gpa: yup.number().required('GPA is required').positive('GPA must be positive'),
+  gpa: yup.number()
+    .typeError('GPA must be a number')
+    .required('GPA is required')
+    .min(0, 'GPA cannot be negative')
+    .test('gpa-within-scale', 'GPA exceeds the selected scale', function(value) {
+      const { gpa_scale } = this.parent;
+      if (!value || !gpa_scale) return true;
+      const maxGpa = parseFloat(gpa_scale);
+      return value <= maxGpa;
+    }),
   gpa_scale: yup.string().required('GPA scale is required'),
   graduation_year: yup.number()
+    .typeError('Graduation year must be a number')
     .required('Graduation year is required')
     .min(1950, 'Graduation year must be after 1950')
     .max(new Date().getFullYear() + 10, `Graduation year must be before ${new Date().getFullYear() + 10}`),
   
-  // Test Scores (at least one required) - Fixed date handling
+  // Test Scores (Optional, but score required if date provided)
   gre_score: yup.number()
     .nullable()
     .transform((value) => (value === '' || isNaN(value)) ? null : value)
     .min(260, 'GRE score must be between 260-340')
-    .max(340, 'GRE score must be between 260-340'),
-  gre_date: yup.date().nullable().transform((value) => value || null),
+    .max(340, 'GRE score must be between 260-340')
+    .when('gre_date', {
+      is: (date) => date !== null && date !== undefined && date !== '',
+      then: (schema) => schema.required('GRE score is required if a date is provided'),
+      otherwise: (schema) => schema.nullable()
+    }),
+  gre_date: yup.string().nullable().transform((value) => value || null),
+  
   toefl_score: yup.number()
     .nullable()
     .transform((value) => (value === '' || isNaN(value)) ? null : value)
     .min(0, 'TOEFL score must be between 0-120')
-    .max(120, 'TOEFL score must be between 0-120'),
-  toefl_date: yup.date().nullable().transform((value) => value || null),
+    .max(120, 'TOEFL score must be between 0-120')
+    .when('toefl_date', {
+      is: (date) => date !== null && date !== undefined && date !== '',
+      then: (schema) => schema.required('TOEFL score is required if a date is provided'),
+      otherwise: (schema) => schema.nullable()
+    }),
+  toefl_date: yup.string().nullable().transform((value) => value || null),
+  
   ielts_score: yup.number()
     .nullable()
     .transform((value) => (value === '' || isNaN(value)) ? null : value)
     .min(0, 'IELTS score must be between 0-9')
-    .max(9, 'IELTS score must be between 0-9'),
-  ielts_date: yup.date().nullable().transform((value) => value || null),
+    .max(9, 'IELTS score must be between 0-9')
+    .when('ielts_date', {
+      is: (date) => date !== null && date !== undefined && date !== '',
+      then: (schema) => schema.required('IELTS score is required if a date is provided'),
+      otherwise: (schema) => schema.nullable()
+    }),
+  ielts_date: yup.string().nullable().transform((value) => value || null),
   
   // Goals & Preferences
   target_degree: yup.string().required('Target degree is required'),
@@ -58,15 +86,6 @@ const schema = yup.object({
   target_field: yup.string().required('Target field is required'),
   budget_range: yup.string().required('Budget range is required'),
   application_timeline: yup.string().required('Application timeline is required'),
-}).test('at-least-one-test-score', 'At least one test score is required', function(values) {
-  const { gre_score, toefl_score, ielts_score } = values;
-  if (!gre_score && !toefl_score && !ielts_score) {
-    return this.createError({
-      message: 'Please provide at least one test score (GRE, TOEFL, or IELTS)',
-      path: 'test_scores'
-    });
-  }
-  return true;
 });
 
 const steps = [
@@ -101,6 +120,7 @@ function ProfileSetupPage() {
     fetchConstants, 
     updateProfile 
   } = useProfileStore();
+  const { setProfileComplete } = useAuthStore();
   const { theme } = useThemeStore();
   const navigate = useNavigate();
 
@@ -110,10 +130,11 @@ function ProfileSetupPage() {
     control,
     watch,
     setValue,
-    formState: { errors },
+    formState: { errors, dirtyFields },
     trigger,
   } = useForm({
     resolver: yupResolver(schema),
+    mode: 'all',
     defaultValues: {
       preferred_countries: [],
     },
@@ -196,6 +217,7 @@ function ProfileSetupPage() {
       console.log('Sending data:', formattedData); // Debug log
       
       await updateProfile(formattedData);
+      setProfileComplete(true);
       navigate('/dashboard');
     } catch (error) {
       console.error('Profile update error:', error);
@@ -227,6 +249,43 @@ function ProfileSetupPage() {
 
   const handlePrevious = () => {
     setCurrentStep(prev => Math.max(prev - 1, 1));
+  };
+
+  const currentStepFields = steps.find(step => step.id === currentStep)?.fields || [];
+  const watchedFields = watch();
+
+  const isStepComplete = () => {
+    // Basic check: all required fields in current step must have values
+    // and there should be no validation errors for these fields
+    const hasErrors = currentStepFields.some(field => errors[field]);
+    if (hasErrors) return false;
+
+    if (currentStep === 1) {
+      return currentStepFields.every(field => !!watchedFields[field]);
+    }
+    if (currentStep === 2) {
+      // Step 2 is more complex (conditional). 
+      // It's complete if either (no date and no score) or (both date and score are filled)
+      // We check dirtyFields to catch "started typing" even if value is still invalid/partial
+      const isGreStarted = !!watchedFields.gre_date || !!dirtyFields.gre_date || !!watchedFields.gre_score || !!dirtyFields.gre_score;
+      const greValid = isGreStarted ? (!!watchedFields.gre_date && !!watchedFields.gre_score) : true;
+      
+      const isToeflStarted = !!watchedFields.toefl_date || !!dirtyFields.toefl_date || !!watchedFields.toefl_score || !!dirtyFields.toefl_score;
+      const toeflValid = isToeflStarted ? (!!watchedFields.toefl_date && !!watchedFields.toefl_score) : true;
+      
+      const isIeltsStarted = !!watchedFields.ielts_date || !!dirtyFields.ielts_date || !!watchedFields.ielts_score || !!dirtyFields.ielts_score;
+      const ieltsValid = isIeltsStarted ? (!!watchedFields.ielts_date && !!watchedFields.ielts_score) : true;
+      
+      return greValid && toeflValid && ieltsValid;
+    }
+    if (currentStep === 3) {
+      return currentStepFields.every(field => {
+        const val = watchedFields[field];
+        if (Array.isArray(val)) return val.length > 0;
+        return !!val;
+      });
+    }
+    return true;
   };
 
   const renderStepContent = () => {
@@ -598,11 +657,16 @@ function ProfileSetupPage() {
             <button
               type="button"
               onClick={handleNext}
+              disabled={!isStepComplete()}
               className={`inline-flex items-center px-6 py-3 border border-transparent text-sm font-medium rounded-lg transition-all duration-200 ${
+                !isStepComplete()
+                  ? 'opacity-50 cursor-not-allowed'
+                  : 'hover:scale-105 transform'
+              } ${
                 theme === 'dark'
                   ? 'text-mocha-crust bg-mocha-mauve hover:bg-mocha-pink'
                   : 'text-latte-base bg-latte-mauve hover:bg-latte-pink'
-              } hover:scale-105 transform`}
+              }`}
             >
               Next
               <ArrowRightIcon className="ml-2 h-4 w-4" />
@@ -610,12 +674,16 @@ function ProfileSetupPage() {
           ) : (
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || !isStepComplete()}
               className={`inline-flex items-center px-6 py-3 border border-transparent text-sm font-medium rounded-lg transition-all duration-200 ${
+                loading || !isStepComplete()
+                  ? 'opacity-50 cursor-not-allowed'
+                  : 'hover:scale-105 transform'
+              } ${
                 theme === 'dark'
                   ? 'text-mocha-crust bg-mocha-green hover:bg-mocha-teal'
                   : 'text-latte-base bg-latte-green hover:bg-latte-teal'
-              } hover:scale-105 transform disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none`}
+              }`}
             >
               {loading ? <LoadingSpinner size="sm" /> : (
                 <>

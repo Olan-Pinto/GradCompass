@@ -94,8 +94,8 @@ class UserProfileBase(BaseModel):
     # Academic Background
     undergraduate_college: Optional[str] = None
     major: Optional[str] = None
-    gpa: Optional[float] = None
     gpa_scale: Optional[str] = None
+    gpa: Optional[float] = None
     graduation_year: Optional[int] = None
     
     # Test Scores
@@ -132,49 +132,27 @@ class UserProfileBase(BaseModel):
         return v
 
     @validator('gre_score')
-    def validate_gre_score(cls, v):
+    def validate_gre_score(cls, v, values):
+        if v is None and values.get('gre_date'):
+            raise ValueError('GRE score is required if a GRE date is provided')
         if v is not None and (v < 260 or v > 340):
             raise ValueError('GRE score must be between 260 and 340')
         return v
 
     @validator('toefl_score')
-    def validate_toefl_score(cls, v):
+    def validate_toefl_score(cls, v, values):
+        if v is None and values.get('toefl_date'):
+            raise ValueError('TOEFL score is required if a TOEFL date is provided')
         if v is not None and (v < 0 or v > 120):
             raise ValueError('TOEFL score must be between 0 and 120')
         return v
 
     @validator('ielts_score')
-    def validate_ielts_score(cls, v):
+    def validate_ielts_score(cls, v, values):
+        if v is None and values.get('ielts_date'):
+            raise ValueError('IELTS score is required if an IELTS date is provided')
         if v is not None and (v < 0 or v > 9.0):
             raise ValueError('IELTS score must be between 0 and 9.0')
-        return v
-
-    @validator('graduation_year')
-    def validate_graduation_year(cls, v):
-        if v is not None:
-            current_year = datetime.now().year
-            if v < 1950 or v > current_year + 10:
-                raise ValueError(f'Graduation year must be between 1950 and {current_year + 10}')
-        return v
-
-    @validator('preferred_countries')
-    def validate_preferred_countries(cls, v):
-        if v is not None and len(v) == 0:
-            raise ValueError('At least one preferred country must be selected')
-        return v
-
-    # Custom validation to ensure at least one test score is provided
-    @validator('ielts_score')
-    def validate_at_least_one_test_score(cls, v, values):
-        gre_score = values.get('gre_score')
-        toefl_score = values.get('toefl_score')
-        ielts_score = v
-        
-        # Only validate if we're in complete profile creation (all required fields present)
-        if values.get('target_degree') and values.get('target_field'):  # Indicates complete profile
-            if not any([gre_score, toefl_score, ielts_score]):
-                raise ValueError('At least one test score (GRE, TOEFL, or IELTS) is required')
-        
         return v
 
 class UserProfileCreate(UserProfileBase):

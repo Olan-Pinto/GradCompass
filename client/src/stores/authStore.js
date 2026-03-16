@@ -11,6 +11,7 @@ export const useAuthStore = create(
     (set, get) => ({
       user: null,
       token: null,
+      profileComplete: false,
       loading: true,
       
       // Initialize auth on app start
@@ -20,6 +21,14 @@ export const useAuthStore = create(
           axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
           try {
             await get().getCurrentUser();
+            // Also fetch basic profile status to handle redirects
+            try {
+              const response = await axios.get('/profile/completion');
+              set({ profileComplete: response.data.is_complete });
+            } catch (pError) {
+              console.error('Failed to fetch profile status:', pError);
+              set({ profileComplete: false });
+            }
           } catch (error) {
             get().logout();
           }
@@ -37,6 +46,14 @@ export const useAuthStore = create(
           axios.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
           
           await get().getCurrentUser();
+          
+          // Fetch profile status after login
+          try {
+            const profileStatus = await axios.get('/profile/completion');
+            set({ profileComplete: profileStatus.data.is_complete });
+          } catch (pError) {
+            set({ profileComplete: false });
+          }
           
           toast.success('Welcome back!');
           return { success: true };
@@ -89,6 +106,11 @@ export const useAuthStore = create(
         } catch (error) {
           throw error;
         }
+      },
+
+      // Update profile status
+      setProfileComplete: (isComplete) => {
+        set({ profileComplete: isComplete });
       },
 
       // Logout

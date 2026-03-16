@@ -7,6 +7,7 @@ import * as yup from 'yup';
 import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
 import { useAuthStore } from '../../stores/authStore';
 import { useThemeStore } from '../../stores/themeStore';
+import toast from 'react-hot-toast';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 
 const schema = yup.object({
@@ -149,6 +150,19 @@ function LoginPage() {
                 {errors.password && (
                   <p className="mt-2 text-sm text-red-500">{errors.password.message}</p>
                 )}
+              </div>
+              <div className="flex items-center justify-end mt-2">
+                <button
+                  type="button"
+                  onClick={() => toast.success('Password reset functionality coming soon!')}
+                  className={`text-sm font-medium transition-colors ${
+                    theme === 'dark'
+                      ? 'text-mocha-mauve hover:text-mocha-pink'
+                      : 'text-latte-mauve hover:text-latte-pink'
+                  }`}
+                >
+                  Forgot password?
+                </button>
               </div>
             </div>
 

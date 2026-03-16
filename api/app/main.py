@@ -35,6 +35,7 @@ app.add_middleware(
 async def global_exception_handler(request: Request, exc: Exception):
     logger.error(f"Global exception handler caught: {exc}")
     logger.error(f"Request: {request.method} {request.url}")
+    logger.error(f"Origin: {request.headers.get('origin')}")
     logger.error(f"Traceback: {traceback.format_exc()}")
     
     return JSONResponse(
@@ -42,11 +43,6 @@ async def global_exception_handler(request: Request, exc: Exception):
         content={
             "detail": "Internal server error occurred",
             "error": str(exc) if settings.ENVIRONMENT == "development" else "Internal server error"
-        },
-        headers={
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
-            "Access-Control-Allow-Headers": "*",
         }
     )
 

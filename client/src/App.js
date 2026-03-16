@@ -20,13 +20,23 @@ import FinancePlannerPage from './pages/FinancePlannerPage';
 
 // Protected Route Component
 function ProtectedRoute({ children }) {
-  const { user, loading } = useAuthStore();
+  const { user, loading, profileComplete } = useAuthStore();
   
   if (loading) {
     return <LoadingSpinner />;
   }
   
-  return user ? children : <Navigate to="/login" />;
+  if (!user) {
+    return <Navigate to="/login" />;
+  }
+
+  // Redirect to setup if profile is incomplete and user is not already there
+  const isSetupPage = window.location.pathname === '/profile/setup';
+  if (!profileComplete && !isSetupPage) {
+    return <Navigate to="/profile/setup" />;
+  }
+  
+  return children;
 }
 
 // Public Route Component (redirect to dashboard if logged in)
