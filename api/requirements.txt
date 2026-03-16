@@ -36,4 +36,4 @@ pytest-asyncio==0.25.0
 httpx==0.28.1
 
 # Production
-gunicorn==21.2.0
+gunicorn==21.2.0
